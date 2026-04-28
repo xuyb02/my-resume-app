@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>百炼 Qwen Plus 聊天示例</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main class="app">
+    <h1>百炼 Qwen Plus 聊天示例</h1>
+    <p class="usage">
+      使用说明：在下方输入阿里云百炼 API Key，填写问题后点击“生成回复”。本页面仅在当前会话内保留多轮对话历史，不会写入本地存储。
+    </p>
+
+    <section class="card">
+      <label for="apiKey">API Key</label>
+      <input
+        id="apiKey"
+        type="password"
+        placeholder="请输入阿里云百炼 API Key"
+        autocomplete="off"
+      >
+
+      <label for="userInput">用户输入</label>
+      <textarea
+        id="userInput"
+        rows="5"
+        placeholder="请输入你的问题..."
+      ></textarea>
+
+      <div class="actions">
+        <button id="generateBtn" type="button">生成回复</button>
+        <button id="clearBtn" type="button" class="secondary">清空对话</button>
+      </div>
+
+      <p id="loading" class="loading hidden">正在生成回复，请稍候...</p>
+      <p id="error" class="error hidden"></p>
+    </section>
+
+    <section class="card">
+      <h2>回复区</h2>
+      <div id="replyArea" class="reply-area">
+        <p class="placeholder">模型回复会显示在这里。</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="./script.js"></script>
+</body>
+</html>
