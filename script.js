@@ -1,51 +1,75 @@
 const API_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-const MODEL_CONFIG = "qwen-plus"; // 阿里云标准模型名，作业文档笔误已修正
+const MODEL_CONFIG = "qwen-plus";
 
 let conversationHistory = [];
 let currentApiKey = "";
+let currentMode = "resume"; // resume | diagnosis
+let currentTemplate = "standard";
 
-const apiKeyInput = document.getElementById("apiKey");
-const userInput = document.getElementById("userInput");
-const sendBtn = document.getElementById("sendBtn");
-const clearBtn = document.getElementById("clearBtn");
-const chatBox = document.getElementById("chatBox");
-const errorMsg = document.getElementById("errorMsg");
-const modelBadge = document.getElementById("modelBadge");
-const responseMeta = document.getElementById("responseMeta");
+const dom = {
+    apiKey: document.getElementById("apiKey"),
+    input: document.getElementById("userInput"),
+    send: document.getElementById("sendBtn"),
+    clear: document.getElementById("clearBtn"),
+    chat: document.getElementById("chatBox"),
+    error: document.getElementById("errorMsg"),
+    badge: document.getElementById("modelBadge"),
+    meta: document.getElementById("responseMeta"),
+    template: document.getElementById("templateSelect"),
+    modeToggle: document.getElementById("modeToggle"),
+    title: document.getElementById("appTitle"),
+    guide: document.getElementById("appGuide"),
+    exportBar: document.getElementById("exportBar"),
+    exportPdf: document.getElementById("exportPdf"),
+    exportWord: document.getElementById("exportWord"),
+    exportBox: document.getElementById("exportContainer")
+};
 
-apiKeyInput.addEventListener("input", (e) => { currentApiKey = e.target.value.trim(); });
+dom.apiKey.addEventListener("input", (e) => { currentApiKey = e.target.value.trim(); });
+dom.send.addEventListener("click", handleSend);
+dom.input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } });
+dom.clear.addEventListener("click", resetApp);
+dom.modeToggle.addEventListener("click", toggleMode);
+dom.template.addEventListener("change", (e) => { currentTemplate = e.target.value; updatePlaceholder(); });
+dom.exportPdf.addEventListener("click", exportPDF);
+dom.exportWord.addEventListener("click", exportWord);
 
-sendBtn.addEventListener("click", handleSend);
-userInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
-});
+function updatePlaceholder() {
+    if (currentMode === "diagnosis") {
+        dom.input.placeholder = "例如：我目前是大二学生，只会基础 Java，不知道能找什么实习岗位...";
+    } else {
+        const tips = { standard: "请输入经历与目标岗位...", tech: "侧重技术栈、项目深度、开源贡献...", product: "侧重数据分析、用户洞察、原型设计...", fresh: "侧重校园实践、课程设计、学习能力..." };
+        dom.input.placeholder = tips[currentTemplate];
+    }
+}
 
-clearBtn.addEventListener("click", () => {
-    conversationHistory = [];
-    chatBox.innerHTML = `<div class="message assistant system-hint">💡 提示：首次对话请提供背景信息；生成后可直接输入“更简短”“换风格”“侧重某技能”继续修改。</div>`;
-    errorMsg.textContent = "";
-    responseMeta.style.display = "none";
-    userInput.value = "";
-    modelBadge.innerHTML = `<span class="dot"></span> 等待调用...`;
-    modelBadge.classList.remove("active");
-});
+function toggleMode() {
+    currentMode = currentMode === "resume" ? "diagnosis" : "resume";
+    dom.modeToggle.textContent = currentMode === "resume" ? "🔄 切换至职业诊断" : "🔄 切换至简历优化";
+    dom.title.textContent = currentMode === "resume" ? "📝 简历优化与求职信生成器" : "🧭 智能职业诊断与建议";
+    dom.guide.textContent = currentMode === "resume" 
+        ? "输入个人经历或修改建议，AI 将基于上下文持续优化。" 
+        : "技能较弱或迷茫期？AI 会询问你的阶段，提供阶梯学习路线与岗位匹配建议。";
+    updatePlaceholder();
+    resetApp();
+}
 
 async function handleSend() {
-    const text = userInput.value.trim();
+    const text = dom.input.value.trim();
     if (!text) return;
     if (!currentApiKey) { showError("⚠️ 请先粘贴阿里云百炼 API Key"); return; }
 
-    userInput.value = "";
+    dom.input.value = "";
     setLoading(true);
     showError("");
     appendMessage("user", text);
     conversationHistory.push({ role: "user", content: text });
 
     if (conversationHistory.length === 1) {
-        conversationHistory.unshift({
-            role: "system",
-            content: "你是一位资深 HR 与简历优化专家。请根据用户的经历、目标岗位生成结构清晰、数据化、突出亮点的简历内容或求职信。若用户后续提出修改建议，请严格按要求调整，保持多轮对话连贯。"
-        });
+        const sysPrompt = currentMode === "resume"
+            ? `你是一位资深 HR。请严格按【${getTemplateName()}】格式输出简历内容，使用 Markdown 排版。保持专业、数据化、突出亮点。`
+            : "你是一位资深职业规划师。用户技能较弱或处于迷茫期时，请先温和询问其当前阶段（在校生/转行/初级等），了解后提供阶梯式学习路线、匹配岗位建议及避坑指南。保持鼓励与专业。";
+        conversationHistory.unshift({ role: "system", content: sysPrompt });
     }
 
     const startTime = performance.now();
@@ -64,44 +88,82 @@ async function handleSend() {
         const data = await res.json();
         const aiContent = data.choices[0].message.content;
         conversationHistory.push({ role: "assistant", content: aiContent });
-        
         appendMessage("assistant", aiContent);
         updateModelProof(data, performance.now() - startTime);
-    } catch (err) {
-        showError(`❌ ${err.message}`);
-    } finally {
-        setLoading(false);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
+        
+        if (currentMode === "resume") prepareExport(aiContent);
+    } catch (err) { showError(`❌ ${err.message}`); } 
+    finally { setLoading(false); dom.chat.scrollTop = dom.chat.scrollHeight; }
+}
+
+function getTemplateName() {
+    return { standard: "标准通用", tech: "互联网技术岗", product: "产品/运营岗", fresh: "应届生/实习" }[currentTemplate];
 }
 
 function appendMessage(role, content) {
     const div = document.createElement("div");
     div.className = `message ${role}`;
     div.innerHTML = role === "user" ? content.replace(/\n/g, "<br>") : marked.parse(content);
-    chatBox.appendChild(div);
-    chatBox.scrollTop = chatBox.scrollHeight;
+    dom.chat.appendChild(div);
 }
 
-function updateModelProof(data, timeTaken) {
+function updateModelProof(data, time) {
     const model = data.model || MODEL_CONFIG;
-    const usage = data.usage || {};
-    const tokens = `${usage.prompt_tokens || 0}↑ / ${usage.completion_tokens || 0}↓ / 总计 ${usage.total_tokens || 0}`;
-    
-    modelBadge.innerHTML = `<span class="dot"></span> ✅ 已调用 ${model}`;
-    modelBadge.classList.add("active");
-    
-    responseMeta.innerHTML = `
+    const u = data.usage || {};
+    dom.badge.innerHTML = `<span class="dot"></span> ✅ 已调用 ${model}`;
+    dom.badge.classList.add("active");
+    dom.meta.innerHTML = `
         <span class="meta-item">🤖 模型: <b>${model}</b></span>
-        <span class="meta-item">⏱️ 耗时: ${(timeTaken/1000).toFixed(2)}s</span>
-        <span class="meta-item">📊 Token: ${tokens}</span>
+        <span class="meta-item">⏱️ 耗时: ${(time/1000).toFixed(2)}s</span>
+        <span class="meta-item">📊 Token: ${u.prompt_tokens||0}↑ / ${u.completion_tokens||0}↓</span>
     `;
-    responseMeta.style.display = "flex";
+    dom.meta.style.display = "flex";
 }
 
 function setLoading(isLoading) {
-    sendBtn.disabled = isLoading;
-    sendBtn.textContent = isLoading ? "⏳ 模型推理中..." : "✨ 生成 / 继续修改";
+    dom.send.disabled = isLoading;
+    dom.send.textContent = isLoading ? "⏳ 模型推理中..." : "✨ 生成 / 继续修改";
+}
+function showError(msg) { dom.error.textContent = msg; if(msg) setTimeout(()=>dom.error.textContent="", 6000); }
+
+function resetApp() {
+    conversationHistory = [];
+    dom.chat.innerHTML = "";
+    dom.meta.style.display = "none";
+    dom.exportBar.style.display = "none";
+    dom.exportBox.style.display = "none";
+    dom.input.value = "";
+    dom.badge.innerHTML = `<span class="dot"></span> 等待调用...`;
+    dom.badge.classList.remove("active");
+    updatePlaceholder();
 }
 
-function showError(msg) { errorMsg.textContent = msg; if(msg) setTimeout(()=>errorMsg.textContent="", 6000); }
+// 📥 导出逻辑
+function prepareExport(markdown) {
+    dom.exportBox.innerHTML = `<div style="max-width: 680px; margin: 0 auto; color: #111;">${marked.parse(markdown)}</div>`;
+    dom.exportBar.style.display = "flex";
+}
+
+async function exportPDF() {
+    const btn = dom.exportPdf;
+    btn.textContent = "⏳ 生成中..."; btn.disabled = true;
+    try {
+        await html2pdf().set({
+            margin: 15, filename: '简历.pdf', image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).from(dom.exportBox).save();
+    } finally { btn.textContent = "📥 导出 PDF"; btn.disabled = false; }
+}
+
+function exportWord() {
+    const html = `
+        <!DOCTYPE html><html><head><meta charset="utf-8">
+        <style>body{font-family:'SimSun',serif;line-height:1.6;color:#000;padding:20px;}h1,h2,h3{color:#111;}table{border-collapse:collapse;width:100%;}td,th{border:1px solid #333;padding:8px;}ul{margin-left:20px;}</style>
+        </head><body>${dom.exportBox.innerHTML}</body></html>`;
+    const blob = new Blob([html], { type: "application/msword" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "简历.doc"; a.click();
+    URL.revokeObjectURL(url);
+}

@@ -6,15 +6,16 @@
     <title>简历优化与求职信生成器</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
     <div class="app-wrapper">
         <header class="app-header">
-            <h1>📝 简历优化与求职信生成器</h1>
+            <h1 id="appTitle">📝 简历优化与求职信生成器</h1>
             <div class="model-badge" id="modelBadge">
                 <span class="dot"></span> 等待调用...
             </div>
-            <p class="guide">输入个人经历或修改建议，AI 将基于上下文持续优化。支持多轮对话，密钥仅本地内存暂存。</p>
+            <p class="guide" id="appGuide">输入个人经历或修改建议，AI 将基于上下文持续优化。支持多轮对话，密钥仅本地内存暂存。</p>
         </header>
 
         <main class="app-main">
@@ -22,7 +23,17 @@
                 <label for="apiKey">🔑 阿里云百炼 API Key</label>
                 <input type="password" id="apiKey" placeholder="粘贴 Key（仅运行时使用，刷新清除）">
                 
-                <textarea id="userInput" placeholder="例如：我熟悉 Python 与 Django，有 2 年后端经验，目标岗位 AI 算法工程师，请写一段项目经历亮点..."></textarea>
+                <div class="options-row">
+                    <select id="templateSelect">
+                        <option value="standard">📄 标准通用模板</option>
+                        <option value="tech">💻 互联网技术岗模板</option>
+                        <option value="product">🎯 产品/运营岗模板</option>
+                        <option value="fresh">🎓 应届生/实习模板</option>
+                    </select>
+                    <button id="modeToggle" class="secondary">🔄 切换至职业诊断</button>
+                </div>
+
+                <textarea id="userInput" placeholder="例如：我熟悉 Python 与 Django，有 2 年后端经验，目标岗位 AI 算法工程师..."></textarea>
                 
                 <div class="btn-group">
                     <button id="sendBtn">✨ 生成 / 继续修改</button>
@@ -31,15 +42,20 @@
             </div>
 
             <div class="chat-container">
-                <div class="chat-box" id="chatBox">
-                    <div class="message assistant system-hint">
-                        💡 提示：首次对话请提供背景信息；生成后可直接输入“更简短”“换风格”“侧重某技能”继续修改。
-                    </div>
-                </div>
+                <div class="chat-box" id="chatBox"></div>
                 <div id="responseMeta" class="meta-box" style="display:none;"></div>
+                
+                <div class="export-bar" id="exportBar" style="display:none;">
+                    <button id="exportPdf">📥 导出 PDF</button>
+                    <button id="exportWord">📥 导出 Word</button>
+                    <span class="tip">导出内容为纯净排版，不含对话记录</span>
+                </div>
             </div>
             <p id="errorMsg" class="error-msg"></p>
         </main>
+
+        <!-- 隐藏导出容器，保证导出排版干净 -->
+        <div id="exportContainer" style="display:none; padding: 40px; font-family: 'SimSun', serif; line-height: 1.6;"></div>
 
         <footer class="app-footer">
             基于阿里云百炼 OpenAI 兼容接口 | 纯前端静态应用 | 不收集、不上传任何密钥与隐私数据
