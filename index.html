@@ -6,16 +6,15 @@
     <title>简历优化与求职信生成器</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- 稳定版 html2pdf -->
+    <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js"></script>
 </head>
 <body>
     <div class="app-wrapper">
         <header class="app-header">
             <h1 id="appTitle">📝 简历优化与求职信生成器</h1>
-            <div class="model-badge" id="modelBadge">
-                <span class="dot"></span> 等待调用...
-            </div>
-            <p class="guide" id="appGuide">输入个人经历或修改建议，AI 将基于上下文持续优化。支持多轮对话，密钥仅本地内存暂存。</p>
+            <div class="model-badge" id="modelBadge"><span class="dot"></span> 等待调用...</div>
+            <p class="guide" id="appGuide">输入个人经历或修改建议，AI 将基于上下文持续优化。</p>
         </header>
 
         <main class="app-main">
@@ -46,16 +45,17 @@
                 <div id="responseMeta" class="meta-box" style="display:none;"></div>
                 
                 <div class="export-bar" id="exportBar" style="display:none;">
+                    <button id="copyBtn">📋 一键复制</button>
                     <button id="exportPdf">📥 导出 PDF</button>
                     <button id="exportWord">📥 导出 Word</button>
-                    <span class="tip">导出内容为纯净排版，不含对话记录</span>
+                    <span class="tip" id="exportTip">✅ 内容已就绪，点击即可下载或复制</span>
                 </div>
             </div>
             <p id="errorMsg" class="error-msg"></p>
         </main>
 
-        <!-- 隐藏导出容器，保证导出排版干净 -->
-        <div id="exportContainer" style="display:none; padding: 40px; font-family: 'SimSun', serif; line-height: 1.6;"></div>
+        <!-- 隐藏导出容器（离屏渲染用） -->
+        <div id="exportContainer" style="position:fixed;left:-9999px;top:-9999px;width:210mm;padding:20px;background:#fff;font-family:'SimSun',serif;line-height:1.6;color:#000;"></div>
 
         <footer class="app-footer">
             基于阿里云百炼 OpenAI 兼容接口 | 纯前端静态应用 | 不收集、不上传任何密钥与隐私数据
